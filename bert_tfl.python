@@ -1,0 +1,58 @@
+import tensorflow as tf
+import tensorflow_datasets as tfds
+from transformers import BertTokenizer
+from transformers import TFBertForSequenceClassification
+
+# Set up BERT tokenizer
+tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
+
+# Load the data
+data, info = tfds.load('imdb_reviews', with_info=True, as_supervised=True)
+train_data, test_data = data['train'], data['test']
+
+# Prepare the data for BERT input
+max_len = 128
+
+def encode_review(text_tensor, label):
+    text = text_tensor.numpy().decode('utf-8')
+    encoded = tokenizer.encode_plus(
+        text,
+        add_special_tokens=True,
+        max_length=max_len,
+        truncation=True,
+        padding='max_length',
+        return_attention_mask=True,
+        return_token_type_ids=False,
+        return_tensors='tf'
+    )
+    return encoded['input_ids'], encoded['attention_mask'], label
+
+def encode_map_fn(text, label):
+    input_ids, attention_mask, label = tf.py_function(
+        encode_review,
+        inp=[text, label],
+        Tout=[tf.int32, tf.int32, tf.int32]
+    )
+    input_ids.set_shape([max_len])
+    attention_mask.set_shape([max_len])
+    label.set_shape([])
+    return {'input_ids': input_ids, 'attention_mask': attention_mask}, label
+
+train_data = train_data.map(encode_map_fn)
+train_data = train_data.shuffle(10000).batch(32).prefetch(tf.data.AUTOTUNE)
+
+test_data = test_data.map(encode_map_fn)
+test_data = test_data.batch(32).prefetch(tf.data.AUTOTUNE)
+
+# Set up BERT model
+model = TFBertForSequenceClassification.from_pretrained('bert-base-uncased')
+
+# Compile the model
+optimizer = tf.keras.optimizers.Adam(learning_rate=2e-5)
+loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+metric = tf.keras.metrics.SparseCategoricalAccuracy('accuracy')
+model.compile(optimizer=optimizer, loss=loss, metrics=[metric])
+
+# Train the model
+epochs = 2
+history = model.fit(train_data, epochs=epochs, validation_data=test_data)

@@ -1,0 +1,41 @@
+    return [inputIdsPadded, attentionMask];
+  });
+  const trainDataset = tf.data.generator(() => {
+    tf.util.shuffle(tokenizedReviews);
+    const inputIds = tokenizedReviews.map(review => review[0]);
+    const attentionMask = tokenizedReviews.map(review => review[1]);
+    const labels = tokenizedReviews.map(review => review[2]);
+    const numBatches = Math.ceil(inputIds.length / batchSize);
+    return tf.data.zip({xs: tf.data.array(inputIds), ys: tf.data.array(labels), mask: tf.data.array(attentionMask)}).batch(batchSize).take(numBatches);
+  });
+  const trainSteps = Math.ceil(reviews.length / batchSize);
+  await model.fit(trainDataset, {
+    epochs: epochs,
+    stepsPerEpoch: trainSteps,
+    callbacks: tfvis.show.fitCallbacks({name: 'Training Performance'}, ['loss', 'accuracy'])
+  });
+  await model.save('downloads://model');
+  alert('Model trained successfully and saved!');
+});
+
+// Classify text
+textClassifyForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const model = await tf.loadLayersModel('model/model.json');
+  const tokenizer = new BertTokenizer();
+  const maxLen = 128;
+  const text = textInput.value.trim();
+  if (!text) return;
+  const tokens = tokenizer.encode(text);
+  const truncated = tokens.slice(0, maxLen - 2);
+  const inputIds = [...truncated, tokenizer.vocab['[SEP]']];
+  const paddingLength = maxLen - inputIds.length;
+  const inputIdsPadded = [...inputIds, ...Array(paddingLength).fill(tokenizer.vocab['[PAD]'])];
+  const attentionMask = [...Array(inputIds.length).fill(1), ...Array(paddingLength).fill(0)];
+  const inputTensor = tf.tensor2d([inputIdsPadded], [1, maxLen]);
+  const maskTensor = tf.tensor2d([attentionMask], [1, maxLen]);
+  const prediction = model.predict([inputTensor, maskTensor]);
+  const predictedClass = prediction.argMax(axis=1).dataSync()[0];
+  const className = predictedClass === 1 ? 'Positive' : 'Negative';
+  classificationResult.textContent = `Class: ${className}`;
+});

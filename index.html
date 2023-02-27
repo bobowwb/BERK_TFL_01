@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>BERT Text Classification</title>
+    <link rel="stylesheet" href="style.css">
+  </head>
+  <body>
+    <h1>BERT Text Classification</h1>
+    <form id="data-upload">
+      <h2>Upload Data</h2>
+      <input type="file" id="data-file" accept=".json,.csv,.txt" multiple>
+      <button id="upload"  type="submit">Upload</button>
+    </form>
+    <form id="model-train">
+      <h2>Train Model</h2>
+      <button type="submit" disabled>Train</button>
+    </form>
+    <form id="text-classify">
+      <h2>Classify Text</h2>
+      <label for="text-input">Enter text:</label>
+      <input type="text" id="text-input">
+      <button type="submit" disabled>Classify</button>
+      <div id="classification-result"></div>
+    </form>
+    <script type="module" src="./bundle.js"></script>
+  </body>
+</html>
